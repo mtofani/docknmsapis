@@ -1,0 +1,224 @@
+from flask_restx import reqparse
+from flask_restx import Resource
+from flask_restx import Namespace
+from flask import jsonify, request,json
+from core.CamachoDB import CamachoDB
+from core.MasivosDB import MasivosDB
+from models.EventModel import EventModel
+from datetime import datetime
+
+api = Namespace('operaciones', description='Herramientas para la administracion de Tareas de Operaciones')
+
+@api.route('/getStatusCodes/')
+class GetStatusCodes(Resource):
+    @api.response(200, description="Todo OK")
+    
+    def get(self):
+        try:
+            resp = MasivosDB().getStatusCodes()
+            return resp
+        except Exception as e:
+            raise
+
+@api.route('/getEventTypes/')
+class GetEventTypes(Resource):
+    @api.response(200, description="Todo OK")
+    
+    def get(self):
+        try:
+            resp = MasivosDB().getEventTypes()
+            return resp
+        except Exception as e:
+            raise
+
+@api.route('/getAllEvents/')
+class GetAllEvents(Resource):
+    @api.marshal_with(EventModel(api).get(), envelope='event')
+    @api.response(200, description="Todo OK", model=EventModel(api).get())
+
+    def get(self):
+        try:
+            resp = MasivosDB().getEvents()
+            return resp
+        except Exception as e:
+            raise
+
+@api.route('/getEventById/<int:id>')
+@api.doc(params={'id': 'Identificador del evento a buscar'})
+class GetEventById(Resource):
+    @api.marshal_with(EventModel(api).get(), envelope='event')
+    @api.response(200, description="Todo OK", model=EventModel(api).get())
+    
+    def get(self, id):
+        try:
+            resp = MasivosDB().getEvent(id)
+            return resp
+        except Exception as e:
+            resp = {500, "Error"}
+            return resp
+
+@api.route('/cleanEvent/<int:id>', methods=['PATCH'])
+@api.doc(params={'id': 'Identificador del evento a borrar'})
+class CleanEvent(Resource):
+    
+    def patch(self, id):
+
+        try:
+            MasivosDB().deleteEvent(id)
+            MasivosDB().deleteSubs(id)
+            return jsonify({'message': 'Evento eliminado correctamente'})
+
+        except Exception as e:
+            return jsonify({'message': e})
+
+@api.route('/getAffectedSubs/<int:id>')
+@api.doc(params={'id': 'Identificador del evento a buscar'})
+class GetAffectedSubs(Resource):
+    @api.response(200, description="Todo OK")
+    
+    def get(self, id):
+        try:
+            resp = jsonify(MasivosDB().getAffectedSubsByEvent(id))
+            return resp
+        except Exception as e:
+            resp = {500, "Error"}
+            return resp
+
+# mtt, olt, port, cto, splitter, event_type, event_start, event_finish, status
+@api.route('/insertEvent/')
+@api.doc(params={'mtt': 'Master Trouble Ticket'})
+@api.doc(params={'olt': 'OLT afectada'})
+@api.doc(params={'port': 'Puerto(s) afectado(s)'})
+@api.doc(params={'cto': 'CTO(s) afectado(s)'})
+@api.doc(params={'splitter': 'Splitter(s) afectado(s)'})
+@api.doc(params={'event_type': 'Tipo de Evento'})
+@api.doc(params={'event_start': 'Fecha y Hora del comienzo del Evento - Formato Y-m-d H:M:S'})
+@api.doc(params={'event_finish': 'Fecha y Hora del Final del Evento - Formato Y-m-d H:M:S'})
+@api.doc(params={'status': 'Status Actual del Evento'})
+@api.doc(params={'user': 'Usuario que solicita la carga'})
+class InsertEvent(Resource):
+    @api.response(200, description="Todo OK")
+    
+    def post(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('mtt', type=int)
+        parser.add_argument('olt', type=str)
+        parser.add_argument('port', type=str)
+        parser.add_argument('cto', type=str)
+        parser.add_argument('splitter', type=str)
+        parser.add_argument('event_type', type=int)
+        parser.add_argument('event_start', type=lambda x: datetime.strptime(x,'%Y-%m-%d %H:%M:%S'))
+        parser.add_argument('event_finish', type=lambda x: datetime.strptime(x,'%Y-%m-%d %H:%M:%S'))
+        parser.add_argument('status', type=int)
+        parser.add_argument('user', type=str)
+        args = parser.parse_args()
+        
+        
+        try:
+            lastId = MasivosDB().inserEvent(mtt=args['mtt'], olt=args['olt'], port=args['port'], cto=args['cto'], 
+                                                splitter=args['splitter'], event_type=args['event_type'], event_start=args['event_start'], 
+                                                event_finish=args['event_finish'], status=args['status'], user=args['user'])
+                        
+            rowId = {
+                "Last_ID": lastId,
+            }
+            resp = jsonify(rowId)
+            return resp
+        except Exception as e:
+            resp = {500, "Error"}
+            return resp
+
+@api.route('/updateEvent/')
+@api.doc(params={'id': 'Identificador del Evento'})
+@api.doc(params={'event_finish': 'Fecha y Hora del Final del Evento - Formato Y-m-d H:M:S'})
+@api.doc(params={'status': 'Status Actual del Evento'})
+class UpdateEvent(Resource):
+    @api.response(200, description="Todo OK")
+    
+    def patch(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('id')
+        parser.add_argument('event_finish', type=lambda x: datetime.strptime(x,'%Y-%m-%d %H:%M:%S'))
+        parser.add_argument('status')
+        args = parser.parse_args()
+
+        try:
+            MasivosDB().updateEvent(id=args['id'], event_finish=args['event_finish'], status=args['status'])
+
+            resp = jsonify("Todo OK")
+            return resp
+        except Exception as e:
+            resp = {500, "Error"}
+            return resp
+
+
+@api.route('/insertAffectedSubs/')
+@api.doc(params={'id': 'Identificador del Evento'})
+@api.doc(params={'affected_subs': 'Listado separado por comas de las subscripciones afectadas'})
+class InsertAffectedSubs(Resource):
+    @api.response(200, description="Todo OK")
+    
+    def post(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('id')
+        parser.add_argument('affected_subs')
+        args = parser.parse_args()
+
+        try:
+            subs = args['affected_subs'].split(",")
+            for sub in subs:
+                MasivosDB().insertAffectedSubs(args['id'], sub)
+
+            resp = jsonify("Todo OK")
+            return resp
+        except Exception as e:
+            resp = {500, e}
+            return resp
+
+@api.route('/isSubsAffected/<int:subs>')
+@api.doc(params={'subs': 'Identificador del evento a buscar'})
+class IsSubsAffected(Resource):
+    @api.response(200, description="Todo OK")
+
+    def get(self, subs):
+        try:
+            resp = jsonify(MasivosDB().isSubsAffected(subs))
+            return resp
+        except Exception as e:
+            raise
+
+
+@api.route('/getCTOsByName/')
+@api.doc(params={'name': 'Nombre de la CTO'})
+class GetCTOsByName(Resource):
+    @api.response(200, description="Todo OK")
+    
+    def get(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('name')
+        args = parser.parse_args()
+
+        try:
+            resp = CamachoDB().getCTOsByName(args['name'])
+            return resp
+        except Exception as e:
+            resp = {500, "Error"}
+            return resp
+
+
+@api.route('/getSubsByCTO/')
+@api.doc(params={'id': 'Identificador de la CTO'})
+class GetSubsByCTO(Resource):
+    @api.response(200, description="Todo OK")
+    
+    def get(self):
+        parser = reqparse.RequestParser()
+        parser.add_argument('id')
+        args = parser.parse_args()
+
+        try:
+            resp = CamachoDB().getSubsByCTO(args['id'])
+            return resp
+        except Exception as e:
+            resp = {500, "Error"}
+            return resp
