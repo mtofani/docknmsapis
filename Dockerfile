@@ -43,6 +43,9 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=bind,source=requirements.txt,target=requirements.txt \
     python -m pip install -r requirements.txt
 
+COPY apis namespaces
+COPY app.py .
+
 # Switch to the non-privileged user to run the application.
 USER appuser
 
@@ -50,7 +53,9 @@ USER appuser
 COPY . .
 
 # Expose the port that the application listens on.
-EXPOSE 8080
+EXPOSE $APP_PORT
 
 # Run the application.
-CMD gunicorn 'app:app' --bind=0.0.0.0:8080
+
+CMD ["python", "app.py"]
+#CMD gunicorn 'app:app' --bind=0.0.0.0:8080

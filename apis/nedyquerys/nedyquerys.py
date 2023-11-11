@@ -4,10 +4,10 @@ from flask_restx import Namespace, Resource, fields
 from flask_httpauth import HTTPBasicAuth
 from core.NedyQuerys import Nedy
 from core.MiscTools import MiscTools
-from .nmssec import auth
+from ..nmssec import auth
 
 from core.APIDB import APIDB
-
+    
 
 # configure root logger
 logging.basicConfig(level=logging.INFO)

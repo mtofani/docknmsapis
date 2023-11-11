@@ -7,12 +7,11 @@
 # You can add other services your application may depend on here, such as a
 # database or a cache. For examples, see the Awesome Compose repository:
 # https://github.com/docker/awesome-compose
-services:
-  server:
-    build:
-      context: .
-    ports:
-      - 8080:8080
+#services:
+#server:
+# build:
+# context: .
+##  - 8080:8080
 
 # The commented out section below is an example of how to define a PostgreSQL
 # database that your application can use. `depends_on` tells Docker Compose to
@@ -47,3 +46,35 @@ services:
 #   db-password:
 #     file: db/password.txt
 
+version: "3"
+
+services:
+  nedyquerys:
+    build: .
+    command: python app.py nedyquerys
+    volumes:
+      - ./namespaces:/app/namespaces
+    networks:
+      - my_network
+    environment:
+      - APP_PORT=${APP_PORT:-8080}
+    ports:
+      - "8080:8080"
+
+  masivos:
+    build: .
+    command: python app.py masivos
+    volumes:
+      - ./namespaces:/app/namespaces
+    networks:
+      - my_network
+    environment:
+      - APP_PORT=${APP_PORT:-8080}
+    ports:
+      - "8081:8080"
+
+  # Agrega servicios para otros namespaces si es necesario...
+
+networks:
+  my_network:
+    driver: bridge
